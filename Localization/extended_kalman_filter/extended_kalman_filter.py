@@ -10,7 +10,7 @@ import math
 
 import matplotlib.pyplot as plt
 import numpy as np
-
+from mykf.kf import KalmanFilter
 # Covariance for EKF simulation
 Q = np.diag([
     0.1,  # variance of location on x-axis
@@ -24,6 +24,7 @@ R = np.diag([1.0, 1.0]) ** 2  # Observation x,y position covariance
 INPUT_NOISE = np.diag([1.0, np.deg2rad(30.0)]) ** 2
 GPS_NOISE = np.diag([0.5, 0.5]) ** 2
 
+print("GPS_NOISE",GPS_NOISE)
 DT = 0.1  # time tick [s]
 SIM_TIME = 50.0  # simulation time [s]
 
@@ -88,9 +89,9 @@ def jacob_f(x, u):
     yaw_{t+1} = yaw_t+omega*dt
     v_{t+1} = v{t}
     so
-    dx/dyaw = -v*dt*sin(yaw)
-    dx/dv = dt*cos(yaw)
-    dy/dyaw = v*dt*cos(yaw)
+    dx/dyaw = -v*dt*sin(yaw) # x 对yaw求导数
+    dx/dv = dt*cos(yaw) # x 对 v 求导数
+    dy/dyaw = v*dt*cos(yaw) 
     dy/dv = dt*sin(yaw)
     """
     yaw = x[2, 0]
@@ -163,28 +164,47 @@ def main():
     time = 0.0
 
     # State Vector [x y yaw v]'
-    xEst = np.zeros((4, 1))
+    xEst = np.zeros((4, 1)) # 预测值
     xTrue = np.zeros((4, 1))
     PEst = np.eye(4)
+    print(PEst)
+    xDR = np.zeros((4, 1))  # Dead reckoning 航位推测法
 
-    xDR = np.zeros((4, 1))  # Dead reckoning
+    F_in = np.array([[1.0, 0, 0, 0],
+                  [0, 1.0, 0, 0],
+                  [0, 0, 1.0, 0],
+                  [0, 0, 0, 0]])
+    H_in = np.array([
+        [1, 0, 0, 0],
+        [0, 1, 0, 0]
+    ])
+    mykf = KalmanFilter(xEst,F_in,PEst,Q,H_in,R)
 
     # history
     hxEst = xEst
+    myhxEst = xEst
     hxTrue = xTrue
     hxDR = xTrue
     hz = np.zeros((2, 1))
 
     while SIM_TIME >= time:
         time += DT
-        u = calc_input()
-
-        xTrue, z, xDR, ud = observation(xTrue, xDR, u)
-
+        u = calc_input() # 行驶速度
+        # print(u)
+        xTrue, z, xDR, ud = observation(xTrue, xDR, u) # 生成数据
+        # print("xTrue",xTrue)
+        # print("z",z) GPS 位置
+        # print("xDR",xDR) 航位推算的位置
+        # print("ud",ud) 带有噪音的速度值
         xEst, PEst = ekf_estimation(xEst, PEst, z, ud)
-
+        mykf.Prediction(ud)
+        mykf.MeasurementUpdate(z)
         # store data history
         hxEst = np.hstack((hxEst, xEst))
+        myhxEst = np.hstack((myhxEst,mykf.x_))
+        print("xEst",xEst)
+        print("myxEst",mykf.x_)
+
         hxDR = np.hstack((hxDR, xDR))
         hxTrue = np.hstack((hxTrue, xTrue))
         hz = np.hstack((hz, z))
@@ -201,10 +221,14 @@ def main():
                      hxDR[1, :].flatten(), "-k")
             plt.plot(hxEst[0, :].flatten(),
                      hxEst[1, :].flatten(), "-r")
+            plt.plot(myhxEst[0, :].flatten(),
+                     myhxEst[1, :].flatten(), color='cyan')
             plot_covariance_ellipse(xEst, PEst)
             plt.axis("equal")
             plt.grid(True)
             plt.pause(0.001)
+
+    print("exit")
 
 
 if __name__ == '__main__':
