@@ -18,17 +18,32 @@ Q = np.diag([
     np.deg2rad(1.0),  # variance of yaw angle
     1.0  # variance of velocity
 ]) ** 2  # predict state covariance
+
+myQ = np.diag([
+    0.1,  # variance of location on x-axis
+    0.1,  # variance of location on y-axis
+    np.deg2rad(1.0),  # variance of yaw angle
+    1.0,  # variance of velocity
+    np.deg2rad(1.0)
+]) ** 2  # predict state covariance
+
+q_2 = np.diag([
+    1.0,  # variance of velocity
+    np.deg2rad(1.0)
+]) ** 2  # predict state covariance
+
 R = np.diag([1.0, 1.0]) ** 2  # Observation x,y position covariance
+myR = np.diag([1.0, np.deg2rad(1.0)]) ** 2  # Observation x,y position covariance
 
 #  Simulation parameter
-INPUT_NOISE = np.diag([1.0, np.deg2rad(30.0)]) ** 2
+INPUT_NOISE = np.diag([0.1, np.deg2rad(3.0)]) ** 2
 GPS_NOISE = np.diag([0.5, 0.5]) ** 2
-
+testt = np.random.normal(1,0.1,501)
 print("GPS_NOISE",GPS_NOISE)
 DT = 0.1  # time tick [s]
 SIM_TIME = 50.0  # simulation time [s]
 
-show_animation = True
+show_animation = False
 
 
 def calc_input():
@@ -175,19 +190,35 @@ def main():
                   [0, 0, 1.0, 0],
                   [0, 0, 0, 0]])
     H_in = np.array([
-        [1, 0, 0, 0],
-        [0, 1, 0, 0]
+        [0, 0, 0, 1, 0],
+        [0, 0, 0, 0, 1]
     ])
-    mykf = KalmanFilter(xEst,F_in,PEst,Q,H_in,R)
+    H_in_2 = np.array([
+        [ 1, 0],
+        [ 0, 1]
+    ])
+
+    xmyEst = np.zeros((5,1))
+    xmyEst_2 = np.zeros((2,1))
+    myPEst = np.array([[1.0, 0, 0, 0, 0],
+                        [0, 1.0, 0, 0, 0],
+                        [0, 0, 1.0, 0, 0],
+                        [0, 0, 0, 10, 0],
+                        [0, 0, 0, 0, 10]])
+    myPEst_2 = np.array([[10.0, 0],
+                        [0, 10]])
+    mykf = KalmanFilter(xmyEst_2,F_in,myPEst_2,q_2,H_in_2,myR)
 
     # history
     hxEst = xEst
-    myhxEst = xEst
+    myhxEst = xmyEst_2
     hxTrue = xTrue
     hxDR = xTrue
+    hud = np.zeros((2, 1))
     hz = np.zeros((2, 1))
-
+    index = 0
     while SIM_TIME >= time:
+        
         time += DT
         u = calc_input() # 行驶速度
         # print(u)
@@ -197,18 +228,22 @@ def main():
         # print("xDR",xDR) 航位推算的位置
         # print("ud",ud) 带有噪音的速度值
         xEst, PEst = ekf_estimation(xEst, PEst, z, ud)
-        mykf.Prediction(ud)
-        mykf.MeasurementUpdate(z)
+        
+        mykf.Prediction(u)
+        ud[0,0] = testt[index]
+        mykf.MeasurementUpdate(ud)
         # store data history
         hxEst = np.hstack((hxEst, xEst))
         myhxEst = np.hstack((myhxEst,mykf.x_))
-        print("xEst",xEst)
-        print("myxEst",mykf.x_)
+        # print("xtrue",xTrue)
+        # print("xEst",xEst)
+        # print("myxEst",mykf.x_)
 
         hxDR = np.hstack((hxDR, xDR))
         hxTrue = np.hstack((hxTrue, xTrue))
+        hud = np.hstack((hud,ud))
         hz = np.hstack((hz, z))
-
+        index += 1
         if show_animation:
             plt.cla()
             # for stopping simulation with the esc key.
@@ -221,13 +256,21 @@ def main():
                      hxDR[1, :].flatten(), "-k")
             plt.plot(hxEst[0, :].flatten(),
                      hxEst[1, :].flatten(), "-r")
-            plt.plot(myhxEst[0, :].flatten(),
-                     myhxEst[1, :].flatten(), color='cyan')
+            # plt.plot(myhxEst[0, :].flatten(),
+            #          myhxEst[1, :].flatten(), color='cyan')
+            
             plot_covariance_ellipse(xEst, PEst)
             plt.axis("equal")
             plt.grid(True)
             plt.pause(0.001)
 
+    tmpx = np.linspace(0,50,501)
+    plt.plot(tmpx,hud[0,:].flatten(), "-r")
+    plt.plot(tmpx,myhxEst[0, :].flatten(),"-g")
+    plt.plot(tmpx,testt,"-b")
+    
+    plt.show()
+    print(np.random.randn(2,1))
     print("exit")
 
 

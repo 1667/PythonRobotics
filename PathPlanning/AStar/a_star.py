@@ -205,8 +205,12 @@ class AStarPlanner:
                     d = math.hypot(iox - x, ioy - y)
                     if d <= self.rr:
                         self.obmap[ix][iy] = True
+                        # plt.plot(ix,iy, '.k')
                         break
 
+        # plt.plot(self.obmap,'o')
+        # plt.show()
+        # print("show plt")
     @staticmethod
     def get_motion_model():
         # dx, dy, cost

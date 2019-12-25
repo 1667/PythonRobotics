@@ -210,7 +210,8 @@ def main():
         hxEst = np.hstack((hxEst, xEst))
         hxDR = np.hstack((hxDR, xDR))
         hxTrue = np.hstack((hxTrue, xTrue))
-
+        print("xtrue",xTrue)
+        print("xest",xEst)
         if show_animation:
             plt.cla()
             # for stopping simulation with the esc key.
