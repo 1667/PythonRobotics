@@ -228,7 +228,7 @@ class AStarPlanner:
 
 def main():
     print(__file__ + " start!!")
-
+    plt.ion()
     # start and goal position
     sx = 10.0  # [m]
     sy = 10.0  # [m]
@@ -267,7 +267,7 @@ def main():
 
     a_star = AStarPlanner(ox, oy, grid_size, robot_radius)
     rx, ry = a_star.planning(sx, sy, gx, gy)
-
+    plt.ioff()
     if show_animation:  # pragma: no cover
         plt.plot(rx, ry, "-r")
         plt.show()

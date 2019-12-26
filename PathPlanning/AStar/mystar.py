@@ -75,7 +75,20 @@ def calc_obstacle_map(ox,oy,reso,vr):
                 if d <= vr/reso:
                     obmap[ix][iy] = True
                     break
-    
+    # print([int(tmplist) for tmplist in obmap])
+    obmap_t = [[0 for i in range(xwidth+1)] for i in range(ywidth+1)]
+    for ix in range(xwidth+1):
+        x = ix + minx
+        for iy in range(ywidth+1):
+            y = iy + miny
+            for iox,ioy in zip(ox,oy):
+                d = math.hypot(iox-x,ioy-y)
+                if d <= vr/reso:
+                    obmap_t[ix][iy] = 1
+                    break
+
+    print(len(obmap_t[0]))
+
     return obmap,minx,miny,maxx,maxy,xwidth,ywidth
 
 
@@ -88,6 +101,8 @@ def verify_node(node,obmap,minx,miny,maxx,maxy):
         return False
 
     return True
+
+
 
 def calc_index(node,xwidth,xmin,ymin):
 
@@ -104,6 +119,7 @@ def get_motion_model():
             [1,1,math.sqrt(2)]]
 
     return motion
+
 
 def calc_heuristic(n1,n2):
     # 计算距离
@@ -123,6 +139,19 @@ def calc_final_path(ngoal,closedset,reso):
         pind = n.pind
 
     return rx,ry
+
+def is_around_obs(node,obmap,minx,miny,maxx,maxy):
+
+    for i in range(-2,3):
+        for j in range(-2,3):
+            node_near = Node(node.x+i, node.y+j,
+                        node.cost+i,None)
+            if not verify_node(node_near,obmap,minx,miny,maxx,maxy):
+                return True
+
+    return False
+
+        
 
 
 def a_star_planning(sx,sy,gx,gy,ox,oy,reso,rr):
@@ -148,10 +177,13 @@ def a_star_planning(sx,sy,gx,gy,ox,oy,reso,rr):
         c_id = min(openset,key=lambda o:openset[o].cost+calc_heuristic(ngoal,openset[o]))
         current = openset[c_id]
 
-        if show_animation:
-            plt.plot(current.x*reso,current.y*reso,"xc")
-            if len(closeset.keys()) % 10 == 0:
-                plt.pause(0.001)
+        # for node in openset.values():
+        #     print(node.cost)
+        # print("=====")
+        # if show_animation:
+        #     plt.plot(current.x*reso,current.y*reso,"xc")
+        #     if len(closeset.keys()) % 10 == 0:
+        #         plt.pause(0.001)
         # plt.show()
         # break
         if current.x == ngoal.x and current.y == ngoal.y:
@@ -168,6 +200,9 @@ def a_star_planning(sx,sy,gx,gy,ox,oy,reso,rr):
             node = Node(current.x+motion[i][0], current.y+motion[i][1],
                         current.cost+motion[i][2],c_id)
             
+            # if is_around_obs(node,obmap,minx,miny,maxx,maxy):
+            #     continue
+
             n_id = calc_index(node,xw,minx,miny)
 
             if n_id in closeset:
