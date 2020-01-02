@@ -5,12 +5,14 @@
 #include <algorithm>
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
-
+#include <time.h> 
+#include <chrono>
 
 
 using namespace std;
 #define map_size 60
 
+#define USE_HEAP 1
 
 class Node {
 
@@ -47,7 +49,12 @@ bool comp_cost(node_pair node1, node_pair node2)
         return (node1.second.cost_g+node1.second.cost_h) < (node2.second.cost_g+node2.second.cost_h);
     }
 }
-
+struct mylesser {
+        bool operator()(const node_pair& node1, const node_pair& node2) const {
+            // printf("out put \n");
+            return (node1.second.cost_g+node1.second.cost_h) > (node2.second.cost_g+node2.second.cost_h);
+        }
+};
 class AStar
 {
 public:
@@ -106,7 +113,32 @@ public:
 
 
     }
+    void print_vecp(vector<node_pair> &tmpvec)
+    {
+        vector<node_pair>::iterator v_iter;
+        for(v_iter=tmpvec.begin(); v_iter!=tmpvec.end(); v_iter++) {
+		    cout<<v_iter->first<<" " <<v_iter->second.cost_g << " " <<v_iter->second.cost_h << " " <<  v_iter->second.cost_g+v_iter->second.cost_h << endl;
+	    }
+        // std::cout << vcp.begin()->second.cost_g+vcp.begin()->second.cost_h << " " << vcp.end()->second.cost_g+vcp.end()->second.cost_h << std::endl;
+        std::cout << "================================" << std::endl;
+        
+    }
+    int get_new_min_f()
+    {
+        
+        // print_vecp(vcp_t);
 
+        if(USE_HEAP)
+        {
+            return vcp_t[0].first;
+        }
+        else{
+            sort(vcp_g.begin(),vcp_g.end(),comp_cost);
+            return vcp_g.begin()->first;
+        }
+
+
+    }
     bool verify_node(Node& node)
     {
         if(node.x < minx || node.y < miny || node.x > maxx || node.y > maxy)
@@ -120,15 +152,97 @@ public:
         return true;
     }
 
+    void insert_node(int index,Node &node)
+    {
+        
+        open_nodes.insert(make_pair(index,node));
+        if(USE_HEAP)
+        {
+            vcp_t.push_back(node_pair(index,node));
+            push_heap(vcp_t.begin(),vcp_t.end(),mylesser());
+        }
+        else{
+            vcp_g.push_back(node_pair(index,node));
+            
+        }
+        
+        
+    }
+
+    void update_node(int index,Node &node)
+    {
+
+        open_nodes[index] = node;
+        vector<node_pair>::iterator iter;
+        if(USE_HEAP)
+        {
+            for(iter = vcp_t.begin(); iter != vcp_t.end(); iter ++ )
+            {
+                if( iter->first == index )
+                {
+                    iter->second = node;
+                    break;
+                }
+            }
+            sort_heap(vcp_t.begin(),vcp_t.end(),mylesser());
+            make_heap(vcp_t.begin(),vcp_t.end(),mylesser());
+        }
+        else{
+            for(iter = vcp_g.begin(); iter != vcp_g.end(); iter ++ )
+            {
+                if( iter->first == index )
+                {
+                    iter->second = node;
+                    break;
+                }
+            }
+
+        }
+        
+        
+
+    }
+
+    void delete_node(int index,Node &node)
+    {
+        open_nodes.erase(index);
+        if(USE_HEAP)
+        {
+            pop_heap(vcp_t.begin(),vcp_t.end(),mylesser());
+            vcp_t.pop_back();
+        }
+        else{
+            vector<node_pair>::iterator iter;
+            for(iter = vcp_g.begin(); iter != vcp_g.end(); )
+            {
+                if( iter->first == index )
+                    iter = vcp_g.erase(iter);
+                else
+                    iter ++ ;
+            }
+        }
+        
+        
+        // std::cout << index  << " " << vcp_g.size() <<" delet " <<open_nodes.size() << std::endl;
+
+    }
+
     void a_star_plan(Node &node_s,Node &node_e)
     {
         int index = calc_node_index(node_s);
-        open_nodes.insert(make_pair(index,node_s));
+        
+        insert_node(index,node_s);
 
-
+        auto beginTime = std::chrono::high_resolution_clock::now();
         while(true)
         {
-            int c_index = get_min_f();
+
+            if(open_nodes.size() <= 0 )
+            {
+                break;
+            }
+
+            int c_index = get_new_min_f();
             Node current_node = open_nodes[c_index];
 
             if(current_node.x == node_e.x && current_node.y == node_e.y)
@@ -141,10 +255,11 @@ public:
                 break;
             }
 
-            open_nodes.erase(c_index);
+            delete_node(c_index,current_node);
             close_nodes.insert(make_pair(c_index,current_node));
 
-            for(int i = 0; i < 8; i++)
+            
+            for(int i = 0; i < 4; i++)
             {
                 double* tmp_m = motion[i];
                 Node tmpNode = Node(current_node.x+tmp_m[0],current_node.y+tmp_m[1],current_node.cost_g+tmp_m[2],c_index);
@@ -163,18 +278,25 @@ public:
 
                 if(open_nodes.find(tmp_index) == open_nodes.end())
                 {
-                    open_nodes.insert(make_pair(tmp_index,tmpNode));
+                    
+                    insert_node(tmp_index,tmpNode);
                 }
                 else{
                     Node in_node = open_nodes[tmp_index];
                     if(in_node.cost_g > tmpNode.cost_g)
                     {
-                        open_nodes[tmp_index] = tmpNode;
+                        
+                        update_node(tmp_index,tmpNode);
+                        
                     }
                 }
 
             }
+            
         }
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto elapsedTime= std::chrono::duration_cast<std::chrono::milliseconds>(endTime - beginTime);
+        std::cout << elapsedTime.count() << " ms"<<std::endl;
     }
     
     void show_path()
@@ -265,11 +387,11 @@ public:
                 {
                     obmap[i][j] = 1;
                 }
-                if(i >= 20 && j == 20)
+                if(i >= map_size-40 && j == 20)
                 {
                     obmap[i][j] = 1;
                 }
-                if(i <= 40 && j == 40)
+                if(i <= map_size-20 && j == map_size-20)
                 {
                     obmap[i][j] = 1;
                 }
@@ -301,17 +423,26 @@ private:
     int maxy = 0;
     int obmap[map_size][map_size] = {0};
     int goals_pind = -1;
+    vector<node_pair> vcp_g;
+    vector<node_pair> vcp_t;
     
 };
 
 int main(int argc, char**argv){
     std::cout << "hello" << std::endl;
 
+    auto beginTime_2 = std::chrono::high_resolution_clock::now();
     AStar star = AStar();
     Node Node_s = Node(30,10,0,-1);
-    Node Node_e = Node(10,50,0,-1);
+    Node Node_e = Node(50,map_size-10,0,-1);
     Node_s.set_cost_h(star.calc_h(Node_s,Node_e));
+      //计时开始
+    auto beginTime = std::chrono::high_resolution_clock::now();
     star.a_star_plan(Node_s,Node_e);
+    auto endTime = std::chrono::high_resolution_clock::now();
+	auto elapsedTime= std::chrono::duration_cast<std::chrono::milliseconds>(endTime - beginTime);
+	auto elapsedTime2= std::chrono::duration_cast<std::chrono::milliseconds>(beginTime - beginTime_2);
+    std::cout << "elapsed time is " << elapsedTime.count() << " ms " << elapsedTime2.count() << " ms" << std::endl;
     star.show_path();
     // for(int i = 0; i < map_size; i++)
     // {
