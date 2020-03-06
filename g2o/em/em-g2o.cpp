@@ -59,7 +59,7 @@ public:
         const CurveFittingVertex *v = static_cast<const CurveFittingVertex *>(_vertices[0]);
         const Vector4d abcd = v->estimate();
         double A = abcd[0],B = abcd[1],C = abcd[2],D = abcd[3];
-        _error(0,0) = _measurement - (A*sin(B*_x)+C*cos(D*_x)); // 观测量减去估计量
+        _error(0,0) = _measurement - (A*sin(B*_x)+C*cos(D*_x)+pow(_x,2)); // 观测量减去估计量
         // cout << "cee "<<_error << endl;
 
     }
@@ -168,7 +168,7 @@ int main(int argc, char**argv)
 
     double a = 5.0, b = 1.0, c = 10.0, d = 2.0; // 真实参数值
     int N = 100;
-    double w_sigma = 0.2;   // 噪声值Sigma
+    double w_sigma = 2.0;   // 噪声值Sigma
     cv::RNG rng;    // 随机数产生器OpenCV
     double abcd[4] = {0, 0, 0, 0};  // 参数的估计值abc
 
@@ -180,7 +180,7 @@ int main(int argc, char**argv)
     {
         //generate a random variable [-10 10]
         double x = rng.uniform(-10., 10.);
-        double y = a * sin(b*x) + c * cos(d *x) + rng.gaussian(w_sigma);
+        double y = a * sin(b*x) + c* cos(d *x)+pow(x,2) + rng.gaussian(w_sigma);
         // double y = a * sin(b*x) + c * cos(d *x);
         x_data.push_back(x);
         y_data.push_back(y);
